@@ -28,46 +28,6 @@ namespace uv
 			this.cost = cost;
 
 		}
-		
-		public cell FindFInRow(List<cell> l)
-		{
-			cell res = null;
-			int distance = 0;
-			foreach (var item in l) {
-				if (item.x == this.x) {
-					if (Math.Abs(this.y - item.y) > distance) {
-						distance = Math.Abs(this.y - item.y);
-						res = item;
-					}
-				}
-			}
-			if (res != null)
-			{
-				return res;
-			}
-
-			return null ;
-		}
-
-		public cell FindFinCol(List<cell> l)
-		{
-			cell res = null;
-			int distance = 0 ;
-			foreach (var item in l) {
-				if (item.y == this.y) {
-					if (Math.Abs(this.x - item.x) > distance) {
-						distance = Math.Abs(this.x - item.x);
-						res = item;
-					}
-				}
-			}
-			if (res != null)
-			{
-				return res;
-			}
-
-			return null ;
-		}
 	}
 	class uv 
 	{
@@ -83,19 +43,23 @@ namespace uv
 			this.mainVars = new List<cell>();
 			this.secondaryVars = new List<cell>();
 			SortVars();
+			this.BaseVar = val;
 			this.u = new double[val.GetLength(0)];
 			this.v = new double[val.GetLength(1)];
 			this.ring = new List<cell>();
-			this.tested = new List<cell>();
+			ring.AddRange(mainVars);
+			this.tempRing = new List<cell>();
 		}
 		List<cell> startingSolution;
 		public List<cell> mainVars;
 		public List<cell> secondaryVars;
 		List<cell> ring;
-		List<cell> tested;
+		List<cell> tempRing;
+		double[,] BaseVar; 
 		double[] u ;
 		double[] v ;
 		int MinChangeIndex;
+		bool firstVisit = true;
 
 		void SortVars()
 		{
@@ -112,13 +76,13 @@ namespace uv
 		{
 			Find_uv();
 			DoRelativeChanges();
-			FindRing(secondaryVars[MinChangeIndex]);
+			FindRing(secondaryVars[MinChangeIndex].x,secondaryVars[MinChangeIndex].y,true);
 			FindTheta();
 			while(!this.check())
 			{
 				Find_uv();
 				DoRelativeChanges();
-				FindRing(secondaryVars[MinChangeIndex]);
+				FindRing(secondaryVars[MinChangeIndex].x,secondaryVars[MinChangeIndex].y,true);
 				FindTheta();
 			}
 		}
@@ -145,67 +109,50 @@ namespace uv
 			}
 		}
 
-		void FindRing(cell sp)
+		void FindRing(int x, int y, bool isRow)
 		{
-			Predicate<cell> inRow = (cell c) => {return c.x == sp.x;};
-			List<cell> inSRow = mainVars.FindAll(inRow);
-			cell fInRow = sp.FindFInRow(inSRow);
-			if(!tested.Contains(fInRow))
-			{
-				tested.Add(fInRow);
-				if (fInRow != null) 
-				{
-					ring.Add(fInRow);
-					if(fInRow.y != secondaryVars[MinChangeIndex].y)
-					{
-						Predicate<cell> inCol = (cell c) => {return c.y == fInRow.y;};
-						List<cell> inSCol = mainVars.FindAll(inCol);
-						cell fInCol = fInRow.FindFinCol(inSCol);
-						if (!tested.Contains(fInCol)) {
-							tested.Add(fInCol);
-							if(fInCol != null)
-							{
-								ring.Add(fInCol);
-								FindRing(fInCol);
-							}
-							else
-							{
-								inSCol.Remove(fInCol);
-								fInCol = fInRow.FindFinCol(inSCol);
-								ring.Add(fInCol);
-								FindRing(fInCol);
-							}
-						}
-					}
-				}
-			}
-			else
-			{
-				inSRow.Remove(fInRow);
-				fInRow = sp.FindFInRow(inSRow);
-				ring.Add(fInRow);
-				if(fInRow.y != secondaryVars[MinChangeIndex].y)
-				{
-					Predicate<cell> inCol = (cell c) => {return c.y == fInRow.y;};
-					List<cell> inSCol = mainVars.FindAll(inCol);
-					cell fInCol = fInRow.FindFinCol(inSCol);
-					if (!tested.Contains(fInCol)) {
-						tested.Add(fInCol);
-						if(fInCol != null)
-						{
-							ring.Add(fInCol);
-							FindRing(fInCol);
-						}
-						else
-						{
-							inSCol.Remove(fInCol);
-							fInCol = fInRow.FindFinCol(inSCol);
-							ring.Add(fInCol);
-							FindRing(fInCol);
-						}
-					}
-				}
-			}
+			if (tempRing.Count + 1 <= ring.Count)
+            {
+                if (isRow)
+                {
+                    for (int j = 0; j < BaseVar.GetLength(1); j++)
+                        if (secondaryVars[MinChangeIndex].x == x && secondaryVars[MinChangeIndex].y == j && !firstVisit)
+                        {
+                            ring.Clear();
+                            ring.AddRange(tempRing);
+                        }
+                        else 
+                        {
+                            firstVisit = false;
+                            if (BaseVar[x, j] != 0 && !tempRing.Exists(f => f.x == x && f.y == j))
+                            {
+                                tempRing.Add(mainVars.Find(f => f.x == x && f.y == j));
+                                FindRing(x, j, !isRow);
+                            }
+                        }
+                }
+                else 
+                {
+                    for (int i = 0; i < BaseVar.GetLength(0); i++)
+                        if (secondaryVars[MinChangeIndex].x == i && secondaryVars[MinChangeIndex].y == y )
+                        {
+                            ring.Clear();
+                            ring.AddRange(tempRing);
+                        }
+                        else
+                        {
+                            if (BaseVar[i, y] != 0 && !tempRing.Exists(f => f.x == i && f.y == y))
+                            {
+                                tempRing.Add(mainVars.Find(f => f.x == i && f.y == y));
+                                FindRing(i, y, !isRow);
+                            }
+                        }
+                }
+            }
+            else 
+            {
+                tempRing.RemoveAt(tempRing.Count -1 );                
+            }
         }
 
 		void FindTheta()
@@ -236,8 +183,7 @@ namespace uv
 			mainVars.Remove(newSecVar);
 			secondaryVars.Remove(newMainVar);
 			secondaryVars.Add(newSecVar);
-			ring.Clear();
-			tested.Clear();
+			RebuildBase();
 		}
 
 		bool check()
@@ -248,6 +194,16 @@ namespace uv
 				}
 			}
 			return true;
+		}
+
+		void RebuildBase()
+		{
+			foreach (var item in mainVars) {
+				BaseVar[item.x,item.y] = item.value;
+			}
+			foreach (var item in secondaryVars) {
+				BaseVar[item.x,item.y] = item.value;
+			}
 		}
 
 	}
